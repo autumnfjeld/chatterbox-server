@@ -4,42 +4,125 @@
  * You'll have to figure out a way to export this function from
  * this file and include it in basic-server.js so that it actually works.
  * *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html. */
+var url = require('url'),
+    path = require('path'),
+    fs = require('fs'),
+   // db = require('../database/SQL/persistent_server.js');
+    db = require('../database/ORM_Refactor/persistent_server_orm.js');
 
-var handleRequest = function(request, response) {
-  /* the 'request' argument comes from nodes http module. It includes info about the
-  request - such as what URL the browser is requesting. */
-
-  /* Documentation for both request and response can be found at
-   * http://nodemanual.org/0.8.14/nodejs_ref_guide/http.html */
-
-  console.log("Serving request type " + request.method + " for url " + request.url);
-
-  var statusCode = 200;
-
-  /* Without this line, this server wouldn't work. See the note
-   * below about CORS. */
-  var headers = defaultCorsHeaders;
-
-  headers['Content-Type'] = "text/plain";
-
-  /* .writeHead() tells our server what HTTP status code to send back */
-  response.writeHead(statusCode, headers);
-
-  /* Make sure to always call response.end() - Node will not send
-   * anything back to the client until you do. The string you pass to
-   * response.end() will be the body of the response - i.e. what shows
-   * up in the browser.*/
-  response.end("Hello, World!");
+var mimeTypes = {
+    "html": "text/html",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "js": "text/javascript",
+    "css": "text/css"
 };
 
-/* These headers will allow Cross-Origin Resource Sharing (CORS).
- * This CRUCIAL code allows this server to talk to websites that
- * are on different domains. (Your chat client is running from a url
- * like file://your/chat/client/index.html, which is considered a
- * different domain.) */
-var defaultCorsHeaders = {
+var headers = {
+  //"Content-Type": "json/application",
+  "Content-Type": "text/plain",
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
   "access-control-allow-headers": "content-type, accept",
   "access-control-max-age": 10 // Seconds.
 };
+
+var statusCodes = {
+  found : 200,
+  created: 201,
+  notFound: 404
+};
+
+var sendResponse = function(response, status, headers, data){
+  response.writeHead(status, headers);
+  response.end(JSON.stringify(data));
+};
+
+var get = function(request, response){
+  if (request.url === '/messages') {
+    db.select( function(messages){
+      sendResponse(response, statusCodes.found, headers, messages);
+    });
+  }else if (request.url === '/') {
+    sendFiles(request, response, "/client/index.html");
+  }else{
+    sendFiles(request, response, "/client"+request.url);
+  }
+
+};
+
+
+var sendFiles = function(request, response, resource){
+  var filename = path.join (process.cwd(), resource);
+
+  fs.readFile(filename, function(err, html){
+    if (err) {
+
+    }else{
+      response.writeHead(statusCodes.found, {'Content-Type':'text'});
+      response.write(html);
+      response.end();
+    }
+  });
+};
+
+var getData = function(request, callback ){
+  var dataString = '';
+  request.on('data', function(chunk) {
+    dataString += chunk;
+  });
+
+  request.on('end', function() {
+    callback(dataString);
+  });
+};
+
+
+var post = function(request, response){
+  getData(request, function(dataString){
+    db.insert(JSON.parse(dataString), function(result){
+      sendResponse(response, statusCodes.created, headers, result);
+    });
+  });   
+};
+
+var options = function(request, response){
+  sendResponse(response, statusCodes.found, headers);
+};
+
+
+var methods = {
+  'GET': get,
+  'POST': post,
+  'OPTIONS': options
+};
+
+exports.handleRequest = function(request, response) {
+  var method = methods[request.method];
+
+  if (method) {
+    method(request, response);
+  }else{
+    console.log('not found');
+    sendResponse(response, statusCodes.notFound, headers);
+  }
+};
+
+
+  // var filename = path.join(process.cwd(), request.url, resource);
+
+  // path.exists(filename, function(result) {
+  //     if(!result) {
+  //       console.log("not exists: " + filename);
+  //       response.writeHead(200, {'Content-Type': 'text/plain'});
+  //       response.write('404 Not Found\n');
+  //       response.end();
+  //     }
+
+  //     var mimeType = mimeTypes[path.extname(filename).split(".")[1]];
+  //     response.writeHead(200, {'Content-Type':mimeType});
+  //     var fileStream = fs.createReadStream(filename);
+  //     fileStream.pipe(response);
+  //     response.end();
+  // });
