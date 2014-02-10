@@ -12,16 +12,16 @@ var friends = [];
 var sendMessage = function(message){
   console.log("send");
   $.ajax({
-  // always use this url
   url: 'http://127.0.0.1:8080/messages',
   type: 'POST',
   data: JSON.stringify(message),
   contentType: 'application/json',
   success: function (data) {
     getMessage();
-    console.log('chatterbox: Message sent');
+    console.log('chatterbox: Messages sent');
   },
   error: function (data) {
+    console.log('data', data);
     // see: https://developer.mozilla.org/en-US/docs/Web/API/console.error
     console.error('chatterbox: Failed to send message');
   }
@@ -31,14 +31,13 @@ var sendMessage = function(message){
 var getMessage = function(){
   console.log("get");
   $.ajax({
-    // always use this url
     url: 'http://127.0.0.1:8080/messages',
     type: 'GET',
     //data: {"order":"-createdAt"},
     contentType: 'application/json',
     success: function (data) {
       displayTexts(data);
-      console.log('chatterbox: Message sent');
+      console.log('chatterbox: Messages received from:', this.url);
     },
     error: function (data) {
       // see: https://developer.mozilla.org/en-US/docs/Web/API/console.error
@@ -49,12 +48,14 @@ var getMessage = function(){
 
 var displayTexts = function(data){
   data = JSON.parse(data);
+  console.log('check all incoming data', data, 'typeof:',typeof data);
+  console.log( '  Check first item in array:', data[0], 'typeof:', typeof data[0]);
   var $messages = $("<ul class='messages'></ul>").appendTo('.messagebox');
-  //console.log('check', $messages);
   $("span").remove();
   $("li").remove();
-
+  //process incoming data - should be refactored into seperate funciton
   _.each(data, function(value){
+    console.log('looping thru data', value.username);
     incomingRooms[value.room] = value.room;
     makeRoom();
     if(value.room && value.room === currentRoom){

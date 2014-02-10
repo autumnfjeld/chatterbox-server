@@ -4,11 +4,16 @@
  * You'll have to figure out a way to export this function from
  * this file and include it in basic-server.js so that it actually works.
  * *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html. */
-var url = require('url'),
+
+ /**
+  * Aut Notes - this was git orgnaization distaster.  Trying to recreate end-of-sprint.
+  * This sprint used only in memory array storage to store 
+  */
+ var url = require('url'),
     path = require('path'),
-    fs = require('fs'),
+    fs = require('fs')
    // db = require('../database/SQL/persistent_server.js');
-    db = require('../database/ORM_Refactor/persistent_server_orm.js');
+    //db = require('../database/ORM_Refactor/persistent_server_orm.js');
 
 var mimeTypes = {
     "html": "text/html",
@@ -33,6 +38,13 @@ var statusCodes = {
   created: 201,
   notFound: 404
 };
+// object to store message data with seeder msg-object
+ var _messages = [{
+    username   : "henri",
+    text      : "Meeeoooo feed me!",
+    timestamp : "10 min ago",
+    room      : "Cat pad"
+  }];
 
 var sendResponse = function(response, status, headers, data){
   response.writeHead(status, headers);
@@ -40,22 +52,49 @@ var sendResponse = function(response, status, headers, data){
 };
 
 var get = function(request, response){
+  console.log('~~~~/message GET request in');
   if (request.url === '/messages') {
-    db.select( function(messages){
-      sendResponse(response, statusCodes.found, headers, messages);
-    });
+    sendResponse(response, 200, headers, _messages);
   }else if (request.url === '/') {
     sendFiles(request, response, "/client/index.html");
   }else{
-    sendFiles(request, response, "/client"+request.url);
+    sendFiles(request, response, "/client"+request.url); //not sure why this is here for this app
   }
-
 };
 
+var post = function(request, response){
+  getData(request, function(dataString){
+    //to store returned dataString as an object need to parse
+    _messages.push(JSON.parse(dataString));
+    sendResponse(response, 201, headers, _messages.length);
+  });   
+};
+
+var options = function(request, response){
+  sendResponse(response, 200, headers);
+};
+
+var methods = {
+  'GET': get,
+  'POST': post,
+  'OPTIONS': options
+};
+
+exports.handleRequest = function(request, response) {
+  var method = methods[request.method];
+
+  if (method) {
+    method(request, response);
+  }else{
+    // if type of method request not found
+    sendResponse(response, 404, headers);
+  }
+};
+
+/******** Helper functions ****************/
 
 var sendFiles = function(request, response, resource){
   var filename = path.join (process.cwd(), resource);
-
   fs.readFile(filename, function(err, html){
     if (err) {
 
@@ -78,36 +117,6 @@ var getData = function(request, callback ){
   });
 };
 
-
-var post = function(request, response){
-  getData(request, function(dataString){
-    db.insert(JSON.parse(dataString), function(result){
-      sendResponse(response, statusCodes.created, headers, result);
-    });
-  });   
-};
-
-var options = function(request, response){
-  sendResponse(response, statusCodes.found, headers);
-};
-
-
-var methods = {
-  'GET': get,
-  'POST': post,
-  'OPTIONS': options
-};
-
-exports.handleRequest = function(request, response) {
-  var method = methods[request.method];
-
-  if (method) {
-    method(request, response);
-  }else{
-    console.log('not found');
-    sendResponse(response, statusCodes.notFound, headers);
-  }
-};
 
 
   // var filename = path.join(process.cwd(), request.url, resource);
